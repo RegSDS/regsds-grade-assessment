@@ -5,18 +5,42 @@ const express = require("express");
 const app = express();
 const math = require("mathjs");
 const port = process.env.GRADE_ASSESSMENT_PORT;
+const axios = require("axios");
 
 app.use(bodyParser.json());
+
+function convertGradeToPoints(grade) {
+  switch (grade) {
+    case "A":
+      return 4.0;
+    case "B+":
+      return 3.5;
+    case "B":
+      return 3.0;
+    case "C+":
+      return 2.5;
+    case "C":
+      return 2.0;
+    case "D+":
+      return 1.5;
+    case "D":
+      return 1.0;
+    case "F":
+      return 0.0;
+    default:
+      return 0.0;
+  }
+}
 
 app.post("/gradeAssessment", (req, res) => {
   const students = req.body.students;
   const criteria = req.body.criteria;
 
+  const isPDF = req.body.isPDF;
   students.sort((a, b) => b.score - a.score);
 
   if (!criteria[0].isGroup) {
     // Criterion -referenced
-    const totalStudents = students.length;
     const AThreshold = criteria[0].A_score;
     const BPlusThreshold = criteria[0].B_plus_score;
     const BThreshold = criteria[0].B_score;
@@ -47,7 +71,6 @@ app.post("/gradeAssessment", (req, res) => {
     });
   } else {
     // Norm - referenced
-    const totalStudents = students.length;
     const scores = students.map((student) => student.score);
     const meanScore = math.mean(scores);
     const stdDeviation = math.std(scores);
@@ -73,8 +96,38 @@ app.post("/gradeAssessment", (req, res) => {
       }
     });
   }
+  let sumGrade = 0;
+  students.forEach((student) => {
+    sumGrade += convertGradeToPoints(student.grade);
+  });
+  const totalStudents = students.length;
+  sumGrade = sumGrade / totalStudents;
 
-  return res.json({ students });
+  let pdfFile = null;
+  if (isPDF) {
+    const genPdfUrl = process.env.GENERATE_PDF_URL || "http://localhost:5000";
+    axios
+      .post(
+        genPdfUrl + "/generate-pdf/grade-assessment",
+        {
+          name: req.body.name,
+          course: req.body.course,
+          gradeAverage: sumGrade,
+          students: students,
+        },
+        {
+          responseType: "arraybuffer",
+        }
+      )
+      .then((response) => {
+        pdfFile = response.data;
+      })
+      .catch((error) => {
+        console.error("Error:", error.message);
+      });
+  }
+
+  return res.json({ students, sumGrade, pdfFile });
 });
 
 app.listen(port, () => {
