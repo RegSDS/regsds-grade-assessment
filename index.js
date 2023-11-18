@@ -1,8 +1,9 @@
 require("dotenv").config();
-
+const cors = require("cors");
 const bodyParser = require("body-parser");
 const express = require("express");
 const app = express();
+app.use(cors());
 const math = require("mathjs");
 const port = process.env.GRADE_ASSESSMENT_PORT;
 const axios = require("axios");
@@ -32,7 +33,7 @@ function convertGradeToPoints(grade) {
   }
 }
 
-app.post("/gradeAssessment", (req, res) => {
+app.post("/gradeAssessment", async (req, res) => {
   const students = req.body.students;
   const criteria = req.body.criteria;
 
@@ -106,17 +107,18 @@ app.post("/gradeAssessment", (req, res) => {
   let pdfFile = null;
   if (isPDF) {
     const genPdfUrl = process.env.GENERATE_PDF_URL || "http://localhost:5000";
-    axios
+    await axios
       .post(
         genPdfUrl + "/generate-pdf/grade-assessment",
         {
           name: req.body.name,
           course: req.body.course,
           gradeAverage: sumGrade,
+          grades:[],
           students: students,
         },
         {
-          responseType: "arraybuffer",
+          responseType: "blob",
         }
       )
       .then((response) => {
@@ -127,7 +129,7 @@ app.post("/gradeAssessment", (req, res) => {
       });
   }
 
-  return res.json({ students, sumGrade, pdfFile });
+  res.send({ students, sumGrade, pdfFile });
 });
 
 app.listen(port, () => {
