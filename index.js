@@ -32,6 +32,10 @@ function convertGradeToPoints(grade) {
   }
 }
 
+app.get("/healthy", (req, res) => {
+  return res.status(200).json();
+});
+
 app.post("/gradeAssessment", async (req, res) => {
   try {
     const students = req.body.students;
